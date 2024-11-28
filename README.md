@@ -1,7 +1,7 @@
 Overview
 ========
 
-Welcome brothers and sisters, this repository's purpose is to give a easy understanding of how Astro Airflow works for Data Migration Between 2 MySql databases.
+Welcome brothers and sisters, this repository's purpose is to give an easy understanding of how Astro Airflow works for Data Migration Between 2 MySql databases.
 
 Quick Start
 ===========================
