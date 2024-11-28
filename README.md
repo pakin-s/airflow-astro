@@ -12,6 +12,31 @@ docker network create <network_name>
 ```
 Run Exchange and Revamp db composes.
 
+Create file name "airflow_settings.yaml", then config this.(you can add connection as many as you want)
+```
+airflow:
+  connections:
+    - conn_id:          # you call connection in dag using this
+      conn_type:        # connection type
+      conn_host:        # if running in same network, container name is useable
+      conn_schema:      # db name (optional)
+      conn_login:       # db user
+      conn_password:    # db password
+      conn_port:        # db port (must be internal port)
+
+    - conn_id:
+      conn_type:
+      conn_host:
+      conn_schema:
+      conn_login:
+      conn_password:
+      conn_port:
+
+  pools: []
+
+  variables: []
+```
+
 To start Astro containers,
 ```
 make start
