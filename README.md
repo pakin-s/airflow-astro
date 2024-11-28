@@ -12,7 +12,7 @@ docker network create <network_name>
 ```
 Run Exchange and Revamp db composes.
 
-Create file name "airflow_settings.yaml", then config this.(you can add connection as many as you want)
+Create file name "airflow_settings.yaml" on your root, then config this.(you can add connection as many as you want)
 ```
 airflow:
   connections:
@@ -46,11 +46,11 @@ or if need to.
 make restart
 ```
 
-Connect all Astro containers to created network,
+Connect all Astro containers to created network(docker ps to see exact name of containers),
 ```
-docker network connect data_migration_network airflow-poc_a4fa9a-webserver-1
-docker network connect data_migration_network airflow-poc_a4fa9a-scheduler-1
-docker network connect data_migration_network airflow-poc_a4fa9a-triggerer-1
+docker network connect data_migration_network airflow-poc_<...>-webserver-1
+docker network connect data_migration_network airflow-poc_<...>-scheduler-1
+docker network connect data_migration_network airflow-poc_<...>-triggerer-1
 ```
 also both Exchange and Revamp containers.
 
