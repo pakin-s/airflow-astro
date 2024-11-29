@@ -13,16 +13,17 @@ docker network create <network_name>
 Run Exchange and Revamp db composes.
 
 Create file name "airflow_settings.yaml" on your root, then config this.(you can add connection as many as you want)
+PS: AND A HUGE NOTE THAT IF CONTAINERS RUNNING IN THE SAME NETWORK THEY USE INTERNAL PORT TO COMMUNICATE, NOT EXTERNAL ONE.
 ```
 airflow:
   connections:
-    - conn_id:          # you call connection in dag using this
-      conn_type:        # connection type
-      conn_host:        # if running in same network, container name is useable
+    - conn_id:          # you call connection in dag using this, to see usage search "conn_id" in dag file
+      conn_type:        # just search airflow conn_type or GPT can help you on this ;)
+      conn_host:        # if running in same network, container name is USABLE here and I myself think that using container name is better that id
       conn_schema:      # db name (optional)
       conn_login:       # db user
       conn_password:    # db password
-      conn_port:        # db port (must be internal port)
+      conn_port:        # db port (must be internal port, and do not be confused with host, it's 2 diffrent thing!)
 
     - conn_id:
       conn_type:
@@ -32,25 +33,28 @@ airflow:
       conn_password:
       conn_port:
 
-  pools: []
+  pools: []             # leave this alone, you don't have to care about it now
 
-  variables: []
+  variables: []         # leave this alone, you don't have to care about it now
 ```
 
 To start Astro containers,
+First
+```
+brew install astro
+```
+
+Then
 ```
 make start
 ```
-or if need to.
-```
-make restart
-```
+(you can see other make commands in Mafile)
 
 Connect all Astro containers to created network(docker ps to see exact name of containers),
 ```
-docker network connect data_migration_network airflow-poc_<...>-webserver-1
-docker network connect data_migration_network airflow-poc_<...>-scheduler-1
-docker network connect data_migration_network airflow-poc_<...>-triggerer-1
+docker network connect <network_name> airflow-poc_<...>-webserver-1
+docker network connect <network_name> airflow-poc_<...>-scheduler-1
+docker network connect <network_name> airflow-poc_<...>-triggerer-1
 ```
 also both Exchange and Revamp containers.
 
@@ -58,5 +62,5 @@ You can check if all containers connected to network by.
 ```
 docker network inspect <network_name>
 ```
-AND A HUGE NOTE THAT IF CONTAINERS RUNNING IN THE SAME NETWORK THEY USE INTERNAL PORT TO COMMUNICATE, NOT EXTERNAL ONE.
 
+MUST: PLZ CREATE NEW BRANCH IF NEEDED TO EDIT ANYTHING, DON'T MESS WITH MY MAIN!!!
