@@ -1,9 +1,11 @@
 from airflow.decorators import dag, task
 from airflow.providers.mysql.hooks.mysql import MySqlHook
-from pendulum import datetime
+from datetime import datetime
 from dataclasses import dataclass
 from typing import Optional, List
 from dataclasses import asdict
+from decimal import Decimal
+import json
 
 
 @dag(
@@ -51,6 +53,21 @@ def migrate_company():
         revenue_amount: Optional[float]
         revenue_year: Optional[int]
 
+    @dataclass
+    class CompanyFiling:
+        id: Optional[int]
+        name_en: Optional[str]
+        symbol: Optional[str]
+        capital_detail_id: Optional[int]
+        logo_url: Optional[str]
+        authorized_capital: Optional[float]
+        paid_up: Optional[float]
+        listed_shared: Optional[int]
+        preferred_shared: Optional[int]
+        created_date: Optional[str]
+        updated_date: Optional[str]
+        state: Optional[str]
+
     @task
     def query_company_securities():
         """
@@ -80,7 +97,7 @@ def migrate_company():
                 cr.year AS revenue_year
             FROM
                 company_securities cs
-            JOIN
+            LEFT JOIN
                 company_revenue cr
             ON
                 cs.companyRevenueId = cr.id
@@ -125,7 +142,7 @@ def migrate_company():
 
     @task
     def filter_invalid_companies(
-            mapped_data: List[CompanySecurities]
+        mapped_data: List[CompanySecurities]
     ) -> List[CompanySecurities]:
         filtered_data = []
 
@@ -136,80 +153,110 @@ def migrate_company():
         return filtered_data
 
     @task
-    def map_to_company(data: List[CompanySecurities]) -> List[Company]:
+    def query_company_filings(company_securities: List[CompanySecurities]):
+        """
+        Queries company filings for the filtered securities.
+        """
+        mysql_conn_id = "mysql_fundraising"
+        results = []
+
+        for security in company_securities:
+            query = f"""
+            SELECT
+                cf.id,
+                cf.name_en,
+                cf.symbol,
+                cf.captitalDetailId,
+                ud.url AS logo_url,
+                cd.authorized_capital,
+                cd.paid_up,
+                cd.listed_shared,
+                cd.preferred_shared,
+                cd.created_date,
+                cd.updated_date,
+                cf.state
+            FROM
+                company_filing cf
+            LEFT JOIN
+                upload_document ud ON cf.logoId = ud.id
+            LEFT JOIN
+                capital_detail cd ON cf.captitalDetailId = cd.id
+            WHERE
+                cf.companySecuritiesId = {security['id']}
+                AND cf.state = 'before_crowd_opinion'
+            """
+            exchange_conn = MySqlHook(mysql_conn_id=mysql_conn_id)
+            result = exchange_conn.get_records(query)
+            results.extend(result)
+
+        exchange_conn.get_conn().close()
+
+        return results
+
+    @task
+    def map_to_company_filings(result) -> List[CompanyFiling]:
+        """
+        Maps the raw query result to a list of dictionaries, ensuring Decimal and datetime fields are serialized properly.
+        """
+        def convert_value(value):
+            if isinstance(value, Decimal):
+                return float(value)
+            elif isinstance(value, datetime):
+                return value.isoformat()
+            return value
+
         mapped_data = [
-            Company(
-                name_th=record['name_th'],
-                name_en=record['name_en'],
-                business_type=record['business_type'],
-                business_characteristics=record['product_description'],
-                past_income=record['revenue_amount'],
-                income_year=record['revenue_year'],
+            CompanyFiling(
+                id=row[0],
+                name_en=row[1],
+                symbol=row[2],
+                capital_detail_id=row[3],
+                logo_url=row[4],
+                authorized_capital=convert_value(row[5]),
+                paid_up=convert_value(row[6]),
+                listed_shared=row[7],
+                preferred_shared=row[8],
+                created_date=convert_value(row[9]),
+                updated_date=convert_value(row[10]),
+                state=row[11],
             )
-            for record in data
+            for row in result
         ]
 
         serialized_data = [asdict(record) for record in mapped_data]
-
         return serialized_data
 
     @task
-    def insert_companies(companies: List[Company]):
-        """
-        Insert the list of companies into the database
-        using the `mysql_backoffice` connection.
-        """
-        mysql_conn_id = "mysql_backoffice"
-        insert_query = """
-            INSERT INTO company (name_th, name_en, business_type, business_characteristics, past_income, income_year)
-            VALUES (%s, %s, %s, %s, %s, %s)
-        """
-
-        exchange_conn = MySqlHook(mysql_conn_id=mysql_conn_id)
-        conn = exchange_conn.get_conn()
-
-        try:
-            with conn.cursor() as cursor:
-                for com in companies:
-
-                    print(f"Inserting company: {
-                          com['name_th']} / {com['name_en']}")
-
-                    cursor.execute(insert_query, (
-                        com['name_th'],
-                        com['name_en'],
-                        com['business_type'],
-                        com['business_characteristics'],
-                        com['past_income'],
-                        com['income_year'],
-                    ))
-
-                conn.commit()
-                print(f"Inserted {len(companies)
-                                  } companies into the database.")
-        except Exception as e:
-            print(f"Error inserting companies: {e}")
-        finally:
-            conn.close()
-
-    # @task
-    # def print_data(data):
-    #     """This task prints any data in a formatted way"""
-    #     print(f"Printing {len(data)} records:")
-    #     for record in data:
-    #         print(json.dumps(record, indent=4, ensure_ascii=False))
+    def print_data(data):
+        """This task prints any data in a formatted way"""
+        print(f"Printing {len(data)} records:")
+        for record in data:
+            print(json.dumps(record, indent=4, ensure_ascii=False))
 
     query_company_securities_task = query_company_securities()
+
     map_to_company_securities_task = map_to_company_securities(
         query_company_securities_task)
+
     filter_invalid_companies_task = filter_invalid_companies(
         map_to_company_securities_task)
-    map_to_company_task = map_to_company(filter_invalid_companies_task)
-    insert_companies_task = insert_companies(map_to_company_task)
+
+    print_companies_task = print_data(filter_invalid_companies_task)
+
+    query_company_filings_task = query_company_filings(
+        filter_invalid_companies_task)
+
+    map_to_company_filings_task = map_to_company_filings(
+        query_company_filings_task)
+
+    print_filings_task = print_data(map_to_company_filings_task)
+
+    # insert_company_and_state_task = insert_company_and_state(
+    #     map_to_company_filings_task, map_to_company_securities_task)
 
     query_company_securities_task >> map_to_company_securities_task
-    filter_invalid_companies_task >> map_to_company_task
-    insert_companies_task
+    filter_invalid_companies_task >> print_companies_task
+    query_company_filings_task >> map_to_company_filings_task >> print_filings_task
 
 
 migrate_company()
