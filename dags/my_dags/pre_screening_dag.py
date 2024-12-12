@@ -1,13 +1,16 @@
 from airflow.decorators import dag
 from datetime import datetime
 from tasks.pre_screening_tasks import (
-    query_company_securities,
-    map_to_company_securities,
+    query_securities,
+    map_to_securities,
     filter_invalid_companies,
-    query_company_filings,
-    map_to_company_filings,
+    query_filings,
+    map_to_filings,
     print_data,
-    filter_securities_from_filing
+    filter_securities_by_filing,
+    insert_company_and_current_state,
+    insert_company_information,
+    insert_capital_details,
 )
 
 
@@ -21,38 +24,43 @@ from tasks.pre_screening_tasks import (
 )
 def migrate_company():
 
-    query_company_securities_task = query_company_securities()
+    query_securities_task = query_securities()
 
-    map_to_company_securities_task = map_to_company_securities(
-        query_company_securities_task)
+    map_to_securities_task = map_to_securities(
+        query_securities_task)
 
-    filter_invalid_companies_task = filter_invalid_companies(
-        map_to_company_securities_task)
+    filter_invalid_securities_task = filter_invalid_companies(
+        map_to_securities_task)
 
-    print_companies_task = print_data(filter_invalid_companies_task)
+    query_filings_task = query_filings(
+        filter_invalid_securities_task)
 
-    query_company_filings_task = query_company_filings(
-        filter_invalid_companies_task)
+    map_to_filings_task = map_to_filings(
+        query_filings_task)
 
-    map_to_company_filings_task = map_to_company_filings(
-        query_company_filings_task)
+    filter_securities_by_filings_task = filter_securities_by_filing(
+        map_to_securities_task, map_to_filings_task)
 
-    print_filings_task = print_data(map_to_company_filings_task)
+    filter_null_securities = filter_invalid_companies(
+        filter_securities_by_filings_task)
 
-    filter_securities_from_filing_task = filter_securities_from_filing(
-        map_to_company_securities_task, map_to_company_filings_task)
+    insert_company_and_current_state_task = insert_company_and_current_state(
+        map_to_filings_task, filter_null_securities)
 
-    filter_xxx = filter_invalid_companies(filter_securities_from_filing_task)
+    insert_capital_details_task = insert_capital_details(map_to_filings_task)
 
-    print_xxx = print_data(filter_xxx)
+    print_capital = print_data(insert_capital_details_task)
 
-    # insert_company_and_state_task = insert_company_and_state(
-    #     map_to_company_filings_task, map_to_company_securities_task)
+    insert_company_information_task = insert_company_information(
+        map_to_filings_task, filter_null_securities, insert_capital_details_task)
 
-    query_company_securities_task >> map_to_company_securities_task
-    filter_invalid_companies_task >> print_companies_task
-    query_company_filings_task >> map_to_company_filings_task >> print_filings_task
-    filter_securities_from_filing_task >> filter_xxx >> print_xxx
+    query_securities_task >> map_to_securities_task
+    filter_invalid_securities_task
+    query_filings_task >> map_to_filings_task
+    filter_securities_by_filings_task >> filter_null_securities
+    insert_company_and_current_state_task >> insert_capital_details_task
+    print_capital
+    insert_company_information_task
 
 
 migrate_company()

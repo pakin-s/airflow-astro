@@ -37,3 +37,10 @@ class CompanyFiling:
     created_date: Optional[str]
     updated_date: Optional[str]
     state: Optional[str]
+
+
+BUSINESS_TYPE_MAPPING = {
+    "บริการ": "service",
+    "ค้าส่ง/ค้าปลีก": "trade",
+    "การผลิต": "production"
+}
