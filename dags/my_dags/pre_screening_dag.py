@@ -49,8 +49,6 @@ def migrate_company():
 
     insert_capital_details_task = insert_capital_details(map_to_filings_task)
 
-    print_capital = print_data(insert_capital_details_task)
-
     insert_company_information_task = insert_company_information(
         map_to_filings_task, filter_null_securities, insert_capital_details_task)
 
@@ -59,7 +57,6 @@ def migrate_company():
     query_filings_task >> map_to_filings_task
     filter_securities_by_filings_task >> filter_null_securities
     insert_company_and_current_state_task >> insert_capital_details_task
-    print_capital
     insert_company_information_task
 
 
